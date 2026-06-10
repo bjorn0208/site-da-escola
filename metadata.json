@@ -1,0 +1,6 @@
+{
+  "name": "Agência Simulator Pro",
+  "description": "Simulador interativo de agência digital. Negocie, crie briefings e entregue sites/APKs em uma interface gamificada estilo WhatsApp/Linear.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
