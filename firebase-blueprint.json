@@ -1,0 +1,138 @@
+{
+  "entities": {
+    "Save": {
+      "title": "Save",
+      "description": "Representa o progresso do usuário no jogo de simulação",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ID do usuário autenticado correspondente"
+        },
+        "level": {
+          "type": "integer",
+          "description": "Nível atual alcançado no simulador"
+        },
+        "totalXp": {
+          "type": "integer",
+          "description": "Total de XP acumulado no simulador"
+        },
+        "currentClientId": {
+          "type": "string",
+          "description": "ID do cliente ativo selecionado pelo usuário"
+        },
+        "activeTab": {
+          "type": "string",
+          "description": "Tab ativa ('simulator' ou 'dashboard')"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp da última alteração"
+        }
+      },
+      "required": ["userId", "level", "totalXp"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Representa um cliente no simulador de agência",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID único do cliente"
+        },
+        "name": {
+          "type": "string",
+          "description": "Nome do contato do cliente"
+        },
+        "companyName": {
+          "type": "string",
+          "description": "Nome da empresa do cliente"
+        },
+        "nicho": {
+          "type": "string",
+          "description": "Nicho de atuação da empresa"
+        },
+        "avatarColor": {
+          "type": "string",
+          "description": "Cor do avatar do cliente"
+        },
+        "avatarEmoji": {
+          "type": "string",
+          "description": "Emoji representativo do cliente"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["aguardando", "negociando", "produzindo", "concluido"],
+          "description": "Status atual no funil de vendas do client"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Número do telefone de contato"
+        },
+        "city": {
+          "type": "string",
+          "description": "Cidade correspondente"
+        },
+        "instagram": {
+          "type": "string",
+          "description": "Perfil de Instagram correspondente"
+        },
+        "siteAtual": {
+          "type": "string",
+          "description": "Site atual da empresa (caso possua)"
+        },
+        "projectType": {
+          "type": "string",
+          "enum": ["site", "app", null],
+          "description": "Tipo de projeto contratado ou nulo"
+        },
+        "proposalSent": {
+          "type": "boolean",
+          "description": "Se a proposta já foi enviada"
+        },
+        "proposalPrice": {
+          "type": "integer",
+          "description": "Valor do orçamento orçado"
+        },
+        "step": {
+          "type": "string",
+          "enum": ["greeting", "waiting_choice", "proposal_pending", "proposal_accepted", "briefing_provided", "in_production", "finalized"],
+          "description": "Estágio de conversação atual"
+        },
+        "progress": {
+          "type": "integer",
+          "description": "Progresso de entrega (0 a 100)"
+        },
+        "linkOrApk": {
+          "type": "string",
+          "description": "Link de entrega ou do APK compilado"
+        },
+        "deliveredAt": {
+          "type": "string",
+          "description": "Data de conclusão e entrega"
+        },
+        "chatHistory": {
+          "type": "array",
+          "description": "Histórico estruturado das mensagens do chat"
+        },
+        "briefing": {
+          "type": "object",
+          "description": "Dados estruturados do briefing do projeto"
+        }
+      },
+      "required": ["id", "name", "companyName", "nicho", "status", "step", "chatHistory", "briefing"]
+    }
+  },
+  "firestore": {
+    "/user_saves/{userId}": {
+      "schema": "Save",
+      "description": "Armazena as informações gerais de progresso do jogador"
+    },
+    "/user_saves/{userId}/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Contatos e estados dos clientes em simulação para este jogador"
+    }
+  }
+}

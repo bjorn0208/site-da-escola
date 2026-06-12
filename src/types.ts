@@ -1,3 +1,5 @@
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
 export interface Message {
   id: string;
   sender: 'client' | 'agency' | 'system';
@@ -59,4 +61,6 @@ export interface GameState {
   totalXp: number;
   level: number;
   activeTab: 'simulator' | 'dashboard';
+  difficulty: Difficulty;
+  theme: 'light' | 'dark';
 }

@@ -1,4 +1,4 @@
-import { Client, Message, BriefingData } from '../types';
+import { Client, Message, BriefingData, Difficulty } from '../types';
 
 const CONTACT_NAMES = [
   'Carlos Eduardo', 'Mariana Rocha', 'Rodrigo Silva', 'Juliana Lima', 
@@ -321,7 +321,7 @@ const CITIES = [
   'Fortaleza/CE', 'Brasília/DF', 'Porto Alegre/RS', 'Goiânia/GO'
 ];
 
-export const generateWeeklyClients = (): Client[] => {
+export const generateWeeklyClients = (difficulty: Difficulty = 'medium'): Client[] => {
   // Shuffle niche templates
   const shuffledTemplates = [...NICHES_TEMPLATES].sort(() => 0.5 - Math.random());
   // Pick 10
@@ -345,6 +345,13 @@ export const generateWeeklyClients = (): Client[] => {
     let projectType: 'site' | 'app' | null = null;
     let proposalSent = false;
     let proposalPrice = 0;
+    
+    // Price adjustment based on difficulty
+    const getPrice = (type: 'site' | 'app') => {
+      if (type === 'site') return difficulty === 'easy' ? 400 : difficulty === 'medium' ? 500 : 700;
+      return difficulty === 'easy' ? 1000 : difficulty === 'medium' ? 1200 : 1600;
+    };
+
     let step: Client['step'] = 'greeting';
     let progress = 0;
     let linkOrApk = '';
@@ -353,18 +360,18 @@ export const generateWeeklyClients = (): Client[] => {
     if (status === 'negociando') {
       projectType = Math.random() > 0.5 ? 'site' : 'app';
       proposalSent = Math.random() > 0.4;
-      proposalPrice = projectType === 'site' ? 500 : 1200;
+      proposalPrice = getPrice(projectType);
       step = proposalSent ? 'proposal_pending' : 'waiting_choice';
     } else if (status === 'produzindo') {
       projectType = Math.random() > 0.5 ? 'site' : 'app';
       proposalSent = true;
-      proposalPrice = projectType === 'site' ? 500 : 1200;
+      proposalPrice = getPrice(projectType);
       step = 'in_production';
       progress = Math.floor(10 + Math.random() * 70); // 10% a 80%
     } else if (status === 'concluido') {
       projectType = Math.random() > 0.5 ? 'site' : 'app';
       proposalSent = true;
-      proposalPrice = projectType === 'site' ? 500 : 1500;
+      proposalPrice = getPrice(projectType);
       step = 'finalized';
       progress = 100;
       linkOrApk = projectType === 'site' 

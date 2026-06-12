@@ -1,15 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { Client, Message } from '../types';
-import { Phone, Video, MoreVertical, Send, CheckCheck, FileText, Image as ImageIcon, Sparkles, Smile, Star, ArrowRight, ClipboardCopy } from 'lucide-react';
+import SpecialistTip from './SpecialistTip';
+import { Phone, Video, MoreVertical, Send, CheckCheck, FileText, Image as ImageIcon, Sparkles, Smile, Star, ArrowRight, ClipboardCopy, Laptop, Smartphone } from 'lucide-react';
+import { Difficulty } from '../types';
 
 interface ChatAreaProps {
   client: Client | null;
   onSendMessage: (text: string, type?: Message['type'], extra?: any) => void;
   onAdvanceClientStep: (action: string) => void; // State progress callback
   isTyping?: boolean;
+  onToggleFocus: () => void;
+  isFocusedMode: boolean;
+  difficulty: Difficulty;
 }
 
-export default function ChatArea({ client, onSendMessage, onAdvanceClientStep, isTyping }: ChatAreaProps) {
+export default function ChatArea({ client, onSendMessage, onAdvanceClientStep, isTyping, onToggleFocus, isFocusedMode, difficulty }: ChatAreaProps) {
   const [inputText, setInputText] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -226,6 +232,9 @@ export default function ChatArea({ client, onSendMessage, onAdvanceClientStep, i
 
   return (
     <div className="flex-1 bg-[#0c0d0e] flex flex-col h-full border-r border-white/5 relative" id="chat_panel">
+      {/* Specialist Tip */}
+      {client?.step === 'waiting_choice' && <SpecialistTip difficulty={difficulty} />}
+      
       {/* Chat Area Header (WhatsApp Web vibe) */}
       <div className="bg-[#141517]/80 backdrop-blur-md px-4 py-3 border-b border-white/5 flex items-center justify-between shrink-0 select-none z-10">
         <div className="flex items-center space-x-3 text-left">
@@ -245,6 +254,9 @@ export default function ChatArea({ client, onSendMessage, onAdvanceClientStep, i
 
         {/* Action icons mockup */}
         <div className="flex items-center space-x-1.5 text-zinc-450">
+          <button onClick={onToggleFocus} className="p-2 hover:bg-white/5 rounded-lg hover:text-white transition" title={isFocusedMode ? "Normal" : "Focado"}>
+            {isFocusedMode ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4 text-slate-400" />}
+          </button>
           <button 
             title="Ligar (Voz)"
             onClick={() => alert(`Simulando chamada de voz para ${client.name} no telefone ${client.phone}...`)}
@@ -295,8 +307,11 @@ export default function ChatArea({ client, onSendMessage, onAdvanceClientStep, i
           }
 
           return (
-            <div
+            <motion.div
               key={msg.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
               className={`flex w-full relative z-10 ${isMe ? 'justify-end' : 'justify-start'}`}
             >
               <div
@@ -337,7 +352,7 @@ export default function ChatArea({ client, onSendMessage, onAdvanceClientStep, i
                   {isMe && <CheckCheck className="w-3.5 h-3.5 text-emerald-450 shrink-0" />}
                 </div>
               </div>
-            </div>
+            </motion.div>
           );
         })}
 

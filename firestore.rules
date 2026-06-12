@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Catch-all default-deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Auth helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Helper to extract fields
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation helpers
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidSave(data, userId) {
+      return data.userId == userId
+        && data.level is int
+        && data.level >= 0
+        && data.totalXp is int
+        && data.totalXp >= 0;
+    }
+
+    function isValidClient(data) {
+      return data.id is string
+        && data.name is string && data.name.size() <= 128
+        && data.companyName is string && data.companyName.size() <= 128
+        && data.nicho is string && data.nicho.size() <= 128
+        && data.status in ['aguardando', 'negociando', 'produzindo', 'concluido']
+        && data.step in ['greeting', 'waiting_choice', 'proposal_pending', 'proposal_accepted', 'briefing_provided', 'in_production', 'finalized']
+        && data.briefing is map
+        && data.chatHistory is list;
+    }
+
+    // Rules matching
+    match /user_saves/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidSave(incoming(), userId);
+      allow update: if isOwner(userId) && isValidSave(incoming(), userId);
+      allow delete: if isOwner(userId);
+
+      match /clients/{clientId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(clientId) && isValidClient(incoming());
+        allow update: if isOwner(userId) && isValidId(clientId) && isValidClient(incoming());
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

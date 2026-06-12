@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Client, GameState, Message } from './types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Difficulty, Client, GameState, Message } from './types';
 import { generateWeeklyClients } from './data/mockClients';
 import WeeklyGoal, { getXpProgress } from './components/WeeklyGoal';
 import LeftSidebar from './components/LeftSidebar';
@@ -9,6 +9,9 @@ import Dashboard from './components/Dashboard';
 import DeliverPreviewModal from './components/DeliverPreviewModal';
 import MockPreviewFrame from './components/MockPreviewFrame';
 import { Sparkles, Star, Trophy, CheckCircle2, ShieldClose, Volume2, X } from 'lucide-react';
+import { auth, googleProvider, signInWithPopup, signOut } from './lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { loadUserGameState, saveUserGameState, testConnection } from './lib/firestoreService';
 
 const LOCAL_STORAGE_KEY = 'agencia_simulator_pro_save_v10_gemini';
 
@@ -28,11 +31,13 @@ export default function App() {
       }
     }
     return {
-      clients: generateWeeklyClients(),
+      clients: generateWeeklyClients('medium'),
       currentClientId: 'client-1',
       totalXp: 0,
       level: 1,
-      activeTab: 'simulator'
+      activeTab: 'simulator',
+      difficulty: 'medium',
+      theme: 'dark'
     };
   });
 
@@ -40,13 +45,114 @@ export default function App() {
   const [deliveringClient, setDeliveringClient] = useState<Client | null>(null);
   const [popupPreviewClient, setPopupPreviewClient] = useState<Client | null>(null);
   const [levelUpMessage, setLevelUpMessage] = useState<string | null>(null);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'info' }[]>([]);
+  const [isFocusedMode, setIsFocusedMode] = useState<boolean>(false);
   const [isTyping, setIsTyping] = useState<boolean>(false);
 
-  // Auto-persist changes to state
+  const addToast = (message: string, type: 'success' | 'info' = 'info') => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  };
+
+  // User state and loader state for Firestore database
+  const [user, setUser] = useState<User | null>(null);
+  const [loadingDb, setLoadingDb] = useState<boolean>(false);
+
+  // Keep a reference to the latest gameState so async auth listeners don't use stale copies
+  const gameStateRef = useRef(gameState);
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  // Handle connection test and listen to Firebase Authentication changes on boot
+  useEffect(() => {
+    testConnection();
+
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        setLoadingDb(true);
+        try {
+          const dbState = await loadUserGameState(currentUser.uid);
+          if (dbState) {
+            setGameState(dbState);
+          } else {
+            // First time login: transfer local progress to user's remote cloud profile
+            await saveUserGameState(currentUser.uid, gameStateRef.current);
+          }
+        } catch (err) {
+          console.error("Erro ao sincronizar dados da nuvem:", err);
+        } finally {
+          setLoadingDb(false);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Auto-persist changes (locally to localStorage immediately, and to Firestore debounced by 1.5s)
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(gameState));
-  }, [gameState]);
+
+    if (!user) return;
+
+    const timeoutId = setTimeout(() => {
+      saveUserGameState(user.uid, gameState).catch((err) => {
+        console.error("Erro no auto-save assíncrono do Firestore:", err);
+      });
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  }, [gameState, user]);
+
+  // Auth Action Handlers
+  const handleLogin = async () => {
+    setLoadingDb(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      console.error("Erro ao fazer login com Google:", err);
+      // Fallback message advising container context solutions
+      alert("Houve um problema de autenticação. Se você estiver usando iframe integrado, por favor tente abrir a aplicação em uma nova aba para permitir popups externos de login!");
+    } finally {
+      setLoadingDb(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    const confirm = window.confirm("Deseja desconectar sua conta na nuvem? Seus dados continuarão salvos de forma segura no banco de dados!");
+    if (!confirm) return;
+    
+    setLoadingDb(true);
+    try {
+      await signOut(auth);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      setGameState({
+        clients: generateWeeklyClients('medium'),
+        currentClientId: 'client-1',
+        totalXp: 0,
+        level: 1,
+        activeTab: 'simulator',
+        difficulty: 'medium',
+        theme: 'dark'
+      });
+    } catch (err) {
+      console.error("Erro ao deslogar:", err);
+    } finally {
+      setLoadingDb(false);
+    }
+  };
+
+  const toggleTheme = () => {
+    setGameState(prev => ({
+      ...prev,
+      theme: prev.theme === 'dark' ? 'light' : 'dark'
+    }));
+  };
 
   // Recalculates levels based on total accumulated XP points
   const checkLevelUp = (additionalXp: number, currentXp: number): { nextLevel: number; leveledUp: boolean } => {
@@ -75,6 +181,7 @@ export default function App() {
       
       if (leveledUp) {
         setLevelUpMessage(`🎉 PARABÉNS! Você subiu para o Nível ${nextLevel}!\nSeus negócios estão prosperando no mercado!`);
+        addToast(`Parabéns! Subiu para o nível ${nextLevel}`, 'success');
         // Web audio context beep alternative
         try {
           const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -108,11 +215,15 @@ export default function App() {
     
     setGameState(prev => ({
       ...prev,
-      clients: generateWeeklyClients(),
+      clients: generateWeeklyClients(prev.difficulty),
       currentClientId: 'client-1',
       activeTab: 'simulator'
     }));
     rewardXp(10);
+  };
+
+  const handleSetDifficulty = (d: Difficulty) => {
+    setGameState(prev => ({...prev, difficulty: d, clients: generateWeeklyClients(d)}));
   };
 
   // Selecting active client from sidebar list
@@ -423,6 +534,7 @@ export default function App() {
 
     // Client answers nicely after 1.5 seconds
     setTimeout(() => {
+      addToast(`${id.split('-')[1]} respondeu à prévia!`, 'info');
       setGameState(prev => ({
         ...prev,
         clients: prev.clients.map(c => c.id === id ? {
@@ -510,6 +622,8 @@ export default function App() {
     // Close modal, activate success trigger triggers
     setDeliveringClient(null);
     rewardXp(100);
+    addToast('Projeto finalizado com sucesso!', 'success');
+    addToast(`Faturamento: R$ ${deliveringClient.proposalPrice}`, 'info');
 
     // Beep sound alternative again for completion
     try {
@@ -533,13 +647,18 @@ export default function App() {
   const currentSelectClient = gameState.clients.find(c => c.id === gameState.currentClientId) || null;
 
   return (
-    <div className="h-screen bg-[#0c0d0e] font-sans flex flex-col overflow-hidden text-slate-100">
+    <div className={`h-screen ${gameState.theme === 'light' ? 'bg-white text-gray-900' : 'bg-[#0c0d0e] text-slate-100'} font-sans flex flex-col overflow-hidden`}>
       
       {/* Top Meta Goal Header Bar */}
       <WeeklyGoal 
         gameState={gameState} 
         onChangeTab={(tab) => setGameState(prev => ({ ...prev, activeTab: tab }))}
         onResetProgress={handleResetProgress}
+        onToggleTheme={toggleTheme}
+        user={user}
+        loadingDb={loadingDb}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
       />
 
       {/* Main Body viewports toggled between simulator (CRM) and portfolio showcases */}
@@ -549,11 +668,13 @@ export default function App() {
           /* Active agency simulator screen split in 3 blocks */
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
             {/* Left sidebar listing contacts */}
-            <LeftSidebar 
-              clients={gameState.clients}
-              currentClientId={gameState.currentClientId}
-              onSelectClient={handleSelectClient}
-            />
+            {!isFocusedMode && (
+              <LeftSidebar 
+                clients={gameState.clients}
+                currentClientId={gameState.currentClientId}
+                onSelectClient={handleSelectClient}
+              />
+            )}
 
             {/* Middle active chat logs */}
             <ChatArea 
@@ -561,16 +682,21 @@ export default function App() {
               onSendMessage={handleSendMessage}
               onAdvanceClientStep={handleAdvanceClientStep}
               isTyping={isTyping}
+              onToggleFocus={() => setIsFocusedMode(!isFocusedMode)}
+              isFocusedMode={isFocusedMode}
+              difficulty={gameState.difficulty}
             />
 
             {/* Right project metadata board */}
-            <ProjectArea 
-              client={currentSelectClient}
-              onStartProject={handleStartProject}
-              onSendPreview={handleSendPreview}
-              onRequestAjustes={handleRequestAjustes}
-              onFinalizeProject={handleFinalizeProject}
-            />
+            {!isFocusedMode && (
+              <ProjectArea 
+                client={currentSelectClient}
+                onStartProject={handleStartProject}
+                onSendPreview={handleSendPreview}
+                onRequestAjustes={handleRequestAjustes}
+                onFinalizeProject={handleFinalizeProject}
+              />
+            )}
           </div>
         ) : (
           /* Separate deliveries Dashboard screen block */
@@ -578,6 +704,7 @@ export default function App() {
             gameState={gameState} 
             onOpenPreview={(client) => setPopupPreviewClient(client)}
             onResetProgress={handleResetProgress}
+            onSetDifficulty={handleSetDifficulty}
           />
         )}
 
@@ -625,51 +752,15 @@ export default function App() {
         </div>
       )}
 
-      {/* PORTAL 4: WELCOME ONBOARDING */}
-      {showWelcome && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#141517] border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-6 text-left space-y-5 animate-fadeIn select-none">
-            
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-lg font-black block">
-                🚀
-              </div>
-              <div>
-                <h3 className="text-white font-black text-sm uppercase tracking-tight">Agência Simulator Pro</h3>
-                <p className="text-slate-500 text-[10px] font-bold">SIMULADOR COMPLETO DE PROJETOS E SEÇÕES</p>
-              </div>
+
+        {/* TOAST NOTIFICATIONS */}
+        <div className="fixed bottom-6 right-6 z-50 space-y-2">
+          {toasts.map(toast => (
+            <div key={toast.id} className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
+              {toast.message}
             </div>
-
-            <div className="space-y-3.5 text-xs text-slate-400 leading-relaxed font-semibold">
-              <p>
-                Bem-vindo ao cockpit da sua própria agência digital! Sua missão nesta semana é atender o chat dos clientes, negociar propostas, gerar briefings e produzir as entregas para atingir <strong className="text-emerald-400">100% da meta semanal</strong>!
-              </p>
-              
-              <div className="space-y-2 bg-[#0c0d0e] p-3.5 rounded-2xl border border-white/5">
-                <p className="text-slate-200 font-bold flex items-center text-[11px] uppercase tracking-wide"><Star className="w-4.5 h-4.5 text-yellow-400 mr-2" /> Como Jogar:</p>
-                <ul className="list-disc list-inside pl-1 space-y-1 text-[11px] text-slate-400">
-                  <li>Selecione clientes marcados como <span className="text-yellow-400">Orçamento 🟡</span> à esquerda.</li>
-                  <li>Siga o fluxo e envie propostas de valor clicando nos botões.</li>
-                  <li>Após o aceite, clique em <strong className="text-indigo-400">Gerar Briefing</strong> para liberar as etapas de produção.</li>
-                  <li>Avance a produção por etapas (Design, Ajustes) e clique em <strong className="text-emerald-400">Finalizar</strong> para registrar o site/APK e faturar o capital!</li>
-                </ul>
-              </div>
-
-              <p className="text-[11px] text-slate-500">
-                Ganhos de XP elevam sua agência de freelancer para elite bilionária. Divirta-se!
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowWelcome(false)}
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl text-xs transition shadow-md cursor-pointer"
-            >
-              Iniciar Agência de Sucesso
-            </button>
-            
-          </div>
+          ))}
         </div>
-      )}
 
     </div>
   );

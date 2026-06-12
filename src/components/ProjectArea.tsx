@@ -51,7 +51,7 @@ Diferenciais Competitivos:
 ${briefing.differentials.map(d => `- ${d}`).join('\n')}
 
 === IDENTIDADE VISUAL & ATIVOS ===
-Paleta de Cores: ${briefing.cores.join(', ')}
+Paleta de Cores (HEX): ${briefing.cores.join(', ')}
 Fontes: ${briefing.fontes.join(' / ')}
 Estilo Estético: ${briefing.estilo || 'Nenhum'}
 ${projectType === 'app' ? 'Módulos & Telas' : 'Estrutura de Seções'}:
@@ -63,6 +63,23 @@ ${(projectType === 'app' ? briefing.telas || [] : briefing.secoes || []).map(s =
     setTimeout(() => {
       setCopied(false);
     }, 2000);
+  };
+
+  const handleDownloadLogo = () => {
+    // Generate a simple SVG for the logo based on the company's briefing colors & icon
+    const svgContent = `
+      <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="200" rx="30" fill="${briefing.cores[0]}" />
+        <text x="50%" y="55%" font-size="80" text-anchor="middle" dominant-baseline="middle">${briefing.logoIcon || '🚀'}</text>
+      </svg>
+    `;
+    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${companyName.replace(/\s+/g, '_')}_logo.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleScrollToBottom = () => {
@@ -355,7 +372,13 @@ ${(projectType === 'app' ? briefing.telas || [] : briefing.secoes || []).map(s =
 
           {/* ASSETS: LOGO & IMAGES (Simulated compiling) */}
           <div className="space-y-2 pt-2.5">
-            <span className="text-slate-500 text-[10px] uppercase font-bold">Visualização do Logotipo</span>
+            <span className="text-slate-500 text-[10px] uppercase font-bold flex justify-between">
+              Visualização do Logotipo
+              <button onClick={handleDownloadLogo} className="text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 cursor-pointer">
+                <ArrowDownToLine className="w-3 h-3" />
+                <span>Baixar</span>
+              </button>
+            </span>
             <div className="bg-[#0c0d0e] p-4 border border-white/5 rounded-xl flex items-center justify-center space-x-3 shadow-inner">
               <div 
                 className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-md border"

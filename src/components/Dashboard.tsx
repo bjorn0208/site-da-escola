@@ -1,15 +1,18 @@
 import React from 'react';
-import { Client, GameState } from '../types';
+import { Difficulty, Client, GameState } from '../types';
 import { getLevelTitle } from './WeeklyGoal';
-import { Trophy, Star, ShieldCheck, DollarSign, ExternalLink, Flame, Sparkles, FolderHeart, Calendar, RefreshCcw, Laptop, Smartphone, Copy } from 'lucide-react';
+import { Trophy, Star, ShieldCheck, DollarSign, ExternalLink, Flame, Sparkles, FolderHeart, Calendar, RefreshCcw, Laptop, Smartphone, Copy, Printer } from 'lucide-react';
+import PerformanceChart from './PerformanceChart';
+import TopAgencies from './TopAgencies';
 
 interface DashboardProps {
   gameState: GameState;
   onOpenPreview: (client: Client) => void;
   onResetProgress: () => void;
+  onSetDifficulty: (difficulty: Difficulty) => void;
 }
 
-export default function Dashboard({ gameState, onOpenPreview, onResetProgress }: DashboardProps) {
+export default function Dashboard({ gameState, onOpenPreview, onResetProgress, onSetDifficulty }: DashboardProps) {
   const { clients, totalXp, level } = gameState;
   
   // Completed list
@@ -25,14 +28,15 @@ export default function Dashboard({ gameState, onOpenPreview, onResetProgress }:
 
   return (
     <div className="flex-1 bg-[#0c0d0e] p-4 md:p-8 overflow-y-auto select-none relative" id="dashboard_panel">
+      
       {/* Sleek radial micro-grid background pattern overlay */}
       <div className="absolute inset-0 bg-micro-grid opacity-5 pointer-events-none" />
       
       {/* Outer Wrapper Container */}
-      <div className="max-w-5xl mx-auto space-y-6 text-left relative z-10">
+      <div className="max-w-5xl mx-auto space-y-6 text-left relative z-10 print:max-w-none print:w-full">
         
         {/* Profile Card and Performance overview */}
-        <div className="bg-[#141517] border border-white/5 rounded-2xl p-6 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
+        <div className="bg-[#141517] border border-white/5 rounded-2xl p-6 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl print:hidden">
           {/* Subtle lighting backdrop */}
           <div className="absolute right-0 top-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
@@ -72,8 +76,21 @@ export default function Dashboard({ gameState, onOpenPreview, onResetProgress }:
         </div>
 
         {/* METRICS ROW */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 print:hidden">
           
+          {/* Difficulty Setting */}
+          <div className="bg-[#141517]/80 backdrop-blur border border-white/5 p-5 rounded-2xl space-y-2 shadow-lg">
+             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block pb-1">Dificuldade</span>
+             <div className="flex gap-1">
+                {(['easy', 'medium', 'hard'] as const).map(d => (
+                    <button key={d} onClick={() => onSetDifficulty(d)} 
+                            className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase transition ${gameState.difficulty === d ? 'bg-indigo-600 text-white' : 'bg-[#0c0d0e] text-slate-400 hover:bg-zinc-800'}`}>
+                        {d}
+                    </button>
+                ))}
+            </div>
+          </div>
+
           {/* Revenue */}
           <div className="bg-[#141517]/80 backdrop-blur border border-white/5 p-5 rounded-2xl space-y-2 shadow-lg">
             <div className="flex items-center justify-between text-slate-400">
@@ -104,6 +121,8 @@ export default function Dashboard({ gameState, onOpenPreview, onResetProgress }:
             <p className="text-[9px] text-slate-500 font-bold leading-relaxed">Média de R$1.200 a R$1.500 p/ APK.</p>
           </div>
 
+          <TopAgencies />
+          
           {/* Goal completion */}
           <div className="bg-[#141517]/80 backdrop-blur border border-white/5 p-5 rounded-2xl space-y-2 shadow-lg">
             <div className="flex items-center justify-between text-slate-400">
@@ -116,14 +135,26 @@ export default function Dashboard({ gameState, onOpenPreview, onResetProgress }:
 
         </div>
 
+        {/* PERFORMANCE CHART */}
+        <PerformanceChart clients={completedClients} />
+
         {/* PORTFOLIO / LISTA DE ENTREGAS */}
-        <div className="space-y-4">
+        <div className="space-y-4" id="portfolio_content">
           <div className="flex items-center justify-between">
             <h3 className="text-white font-black text-sm uppercase tracking-wider flex items-center space-x-2">
               <FolderHeart className="w-5 h-5 text-indigo-400" />
               <span>Projetos Concluídos da Semana ({completedClients.length})</span>
             </h3>
-            <span className="text-slate-500 text-xs font-bold">Portfólio Ativo</span>
+            <div className="flex items-center space-x-2 print:hidden">
+              <span className="text-slate-500 text-xs font-bold">Portfólio Ativo</span>
+              <button
+                onClick={() => window.print()}
+                className="px-3.5 py-1.5 bg-[#0c0d0e] text-indigo-400 hover:text-white font-black text-[10px] rounded-xl border border-white/5 hover:bg-zinc-800 transition flex items-center space-x-1 shadow-sm leading-none cursor-pointer"
+              >
+                <Printer className="w-3 h-3 mr-1" />
+                Exportar Portfólio
+              </button>
+            </div>
           </div>
 
           {completedClients.length === 0 ? (
@@ -144,7 +175,7 @@ export default function Dashboard({ gameState, onOpenPreview, onResetProgress }:
                 return (
                   <div 
                     key={client.id}
-                    className="bg-[#141517]/80 backdrop-blur border border-white/5 rounded-2xl p-5 hover:border-indigo-550/30 transition-all flex flex-col justify-between space-y-4 shadow-lg"
+                    className="bg-[#141517]/80 backdrop-blur border border-white/5 rounded-2xl p-5 hover:border-indigo-550/30 transition-all flex flex-col justify-between space-y-4 shadow-lg print:border-black print:bg-white print:text-black"
                   >
                     <div>
                       {/* Card Head */}
@@ -154,8 +185,8 @@ export default function Dashboard({ gameState, onOpenPreview, onResetProgress }:
                             {client.avatarEmoji}
                           </div>
                           <div>
-                            <span className="text-white font-black text-xs leading-none capitalize block">{client.companyName}</span>
-                            <span className="text-slate-500 text-[9px] mt-1 font-bold block">{client.nicho} • {client.name}</span>
+                            <span className="text-white font-black text-xs leading-none capitalize block print:text-black">{client.companyName}</span>
+                            <span className="text-slate-500 text-[9px] mt-1 font-bold block print:text-gray-600">{client.nicho} • {client.name}</span>
                           </div>
                         </div>
 
@@ -169,22 +200,22 @@ export default function Dashboard({ gameState, onOpenPreview, onResetProgress }:
                       </div>
 
                       {/* Brief details description */}
-                      <p className="text-slate-300 text-[11px] mt-3 leading-relaxed font-semibold">
-                        <strong className="text-slate-450 text-slate-400 font-bold">Objetivo:</strong> {client.briefing.objective}
+                      <p className="text-slate-300 text-[11px] mt-3 leading-relaxed font-semibold print:text-gray-700">
+                        <strong className="text-slate-450 text-slate-400 font-bold print:text-gray-900">Objetivo:</strong> {client.briefing.objective}
                       </p>
 
                       {/* URL / APK display box */}
-                      <div className="bg-[#0c0d0e] p-2.5 rounded-xl border border-white/5 flex items-center justify-between text-xs mt-3 select-all">
+                      <div className="bg-[#0c0d0e] p-2.5 rounded-xl border border-white/5 flex items-center justify-between text-xs mt-3 select-all print:border-gray-300 print:bg-gray-50">
                         <div className="flex items-center space-x-1.5 overflow-hidden">
                           <span className="text-slate-600 text-[10px] uppercase font-mono font-bold">
                             {isApp ? 'APK' : 'URL'}
                           </span>
-                          <span className="text-slate-300 font-mono text-[10px] truncate">
+                          <span className="text-slate-300 font-mono text-[10px] truncate print:text-gray-800">
                             {client.linkOrApk || 'default.site'}
                           </span>
                         </div>
                         <Copy 
-                          className="w-3.5 h-3.5 text-zinc-500 cursor-pointer hover:text-white shrink-0 ml-1"
+                          className="w-3.5 h-3.5 text-zinc-500 cursor-pointer hover:text-white shrink-0 ml-1 print:hidden"
                           onClick={() => {
                             navigator.clipboard.writeText(client.linkOrApk || '');
                           }}
@@ -193,16 +224,16 @@ export default function Dashboard({ gameState, onOpenPreview, onResetProgress }:
                     </div>
 
                     {/* Card Actions Footer */}
-                    <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-1">
-                      <span className="text-[10px] text-slate-500 font-bold flex items-center space-x-1">
-                        <Calendar className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                    <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-1 print:border-gray-200">
+                      <span className="text-[10px] text-slate-500 font-bold flex items-center space-x-1 print:text-gray-500">
+                        <Calendar className="w-3.5 h-3.5 mr-1 text-slate-400 print:text-gray-500" />
                         Delivered {client.deliveredAt || 'Hoje'}
                       </span>
 
                       {/* Trigger dynamic preview */}
                       <button
                         onClick={() => onOpenPreview(client)}
-                        className="px-3.5 py-1.5 bg-[#0c0d0e] text-indigo-400 hover:text-white font-black text-[10px] rounded-xl border border-white/5 hover:bg-zinc-800 transition flex items-center space-x-1 shadow-sm leading-none cursor-pointer"
+                        className="px-3.5 py-1.5 bg-[#0c0d0e] text-indigo-400 hover:text-white font-black text-[10px] rounded-xl border border-white/5 hover:bg-zinc-800 transition flex items-center space-x-1 shadow-sm leading-none cursor-pointer print:hidden"
                       >
                         <ExternalLink className="w-3 h-3 text-indigo-455 mr-1" />
                         Teste de Código

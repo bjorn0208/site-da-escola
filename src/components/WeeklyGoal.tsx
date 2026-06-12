@@ -6,6 +6,11 @@ interface WeeklyGoalProps {
   gameState: GameState;
   onChangeTab: (tab: 'simulator' | 'dashboard') => void;
   onResetProgress: () => void;
+  onToggleTheme: () => void;
+  user: any;
+  loadingDb: boolean;
+  onLogin: () => void;
+  onLogout: () => void;
 }
 
 export function getLevelTitle(level: number): { title: string; color: string; icon: any } {
@@ -48,7 +53,16 @@ export function getXpProgress(xp: number): { currentXpInLevel: number; nextLevel
   };
 }
 
-export default function WeeklyGoal({ gameState, onChangeTab, onResetProgress }: WeeklyGoalProps) {
+export default function WeeklyGoal({ 
+  gameState, 
+  onChangeTab, 
+  onResetProgress,
+  onToggleTheme,
+  user,
+  loadingDb,
+  onLogin,
+  onLogout
+}: WeeklyGoalProps) {
   const completedProjects = gameState.clients.filter(c => c.status === 'concluido').length;
   const totalProjects = gameState.clients.length;
   const progressPercent = totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0;
@@ -122,32 +136,81 @@ export default function WeeklyGoal({ gameState, onChangeTab, onResetProgress }: 
         </div>
 
         {/* Navigation & Controls */}
-        <div className="flex items-center gap-2 shrink-0 justify-end">
+        <div className="flex items-center gap-2 shrink-0 justify-end flex-wrap md:flex-nowrap">
+          <button
+            onClick={onToggleTheme}
+            className="p-2 rounded-lg bg-sleek-dark text-slate-400 hover:text-white border border-sleek-border cursor-pointer"
+          >
+             {gameState.theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          {/* Firestore cloud synchronization state */}
+          {loadingDb ? (
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 border border-white/5 animate-pulse text-[10px] uppercase font-extrabold text-indigo-400">
+              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+              <span>Nuvem Ativa</span>
+            </div>
+          ) : user ? (
+            <div className="flex items-center space-x-2 bg-[#121315] hover:bg-[#15171a] border border-white/5 pl-2 pr-3 py-1 rounded-lg transition">
+              {user.photoURL ? (
+                <img 
+                  src={user.photoURL} 
+                  alt={user.displayName || 'Usuário'} 
+                  className="w-5 h-5 rounded-full border border-indigo-400/30"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[9px] font-black text-white shrink-0">
+                  {user.displayName?.charAt(0) || 'U'}
+                </div>
+              )}
+              <div className="flex flex-col text-left max-w-[90px]">
+                <span className="text-white font-extrabold text-[10px] leading-tight truncate">
+                  {user.displayName?.split(' ')[0] || 'Nuvem'}
+                </span>
+                <button 
+                  onClick={onLogout}
+                  className="text-zinc-500 hover:text-red-400 text-[8px] uppercase font-extrabold tracking-tight text-left cursor-pointer transition-all border-none p-0 bg-transparent"
+                >
+                  Sair
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={onLogin}
+              title="Salvar progresso de forma permanente na nuvem"
+              className="px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all border bg-[#0e1013] hover:bg-zinc-800 text-indigo-400 hover:text-indigo-300 border-white/5 flex items-center space-x-1.5 cursor-pointer shadow-md"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+              <span>Salvar na Nuvem</span>
+            </button>
+          )}
+
           <button
             onClick={() => onChangeTab('simulator')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
               gameState.activeTab === 'simulator'
                 ? 'bg-indigo-600 text-white border-indigo-550 shadow-lg shadow-indigo-600/20'
                 : 'bg-sleek-dark text-slate-300 border-sleek-border hover:text-white hover:bg-zinc-800'
             }`}
           >
-            💬 Atendimento CRM
+            💬 CRM
           </button>
           <button
             onClick={() => onChangeTab('dashboard')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
               gameState.activeTab === 'dashboard'
                 ? 'bg-indigo-600 text-white border-indigo-550 shadow-lg shadow-indigo-600/20'
                 : 'bg-sleek-dark text-slate-300 border-sleek-border hover:text-white hover:bg-zinc-800'
             }`}
           >
-            📊 Dashboard Ganhos
+            📊 Ganhos
           </button>
           
           <button
             onClick={onResetProgress}
             title="Reiniciar Semana / Novos Clientes"
-            className="px-2 py-1.5 rounded-lg bg-sleek-dark text-zinc-500 hover:text-red-400 border border-sleek-border text-[10px] uppercase font-bold tracking-tighter"
+            className="px-2 py-1.5 rounded-lg bg-sleek-dark text-zinc-500 hover:text-red-400 border border-sleek-border text-[10px] uppercase font-bold tracking-tighter cursor-pointer"
           >
             Reset
           </button>
